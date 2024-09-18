@@ -12,7 +12,7 @@ def index():
     return render_template("app.html")
  @app.route("/")
 def index():
-    return render_template("Pago_de_curso.html")
+    return render_template("Pago_Curso.html")
 
 @app.route("/alumnos")
 def alumnos():
