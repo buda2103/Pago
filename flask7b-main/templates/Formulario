@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario 4 Preguntas con Selección</title>
+    <!-- Añade las librerías JQuery, Bootstrap y JQuery Validation -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.3/jquery.validate.min.js" integrity="sha512-pnM+HWgfFIjl7dd5JKY1YoEpA5AmtsjE/3sFVOdNuBJePIqlzwHM9eyXo96AQBWCMfQFViSyMOkV1hpI/YfpHQ==" crossorigin="anonymous"></script>
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+</head>
+<body>
+    <p><b>Formulario de Cuatro Preguntas:</b></p>
+    <form id="frmPreguntas" method="post" enctype="multipart/form-data">
+        <input type="hidden" id="id" name="id">
+
+        <div class="form-group">
+            <label for="Nombre">¿Cuál es tu nombre?</label>
+            <select id="Nombre" name="Nombre" class="form-control" required>
+                <option value="">Selecciona tu nombre</option>
+                <option value="Juan">Juan</option>
+                <option value="María">María</option>
+                <option value="Pedro">Pedro</option>
+                <option value="Ana">Ana</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="Edad">¿Cuál es tu rango de edad?</label>
+            <select id="Edad" name="Edad" class="form-control" required>
+                <option value="">Selecciona tu edad</option>
+                <option value="Menos de 20">Menos de 20</option>
+                <option value="21-30">21-30</option>
+                <option value="31-40">31-40</option>
+                <option value="Más de 40">Más de 40</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="Correo">¿Cuál es tu proveedor de correo electrónico?</label>
+            <select id="Correo" name="Correo" class="form-control" required>
+                <option value="">Selecciona tu proveedor</option>
+                <option value="Gmail">Gmail</option>
+                <option value="Yahoo">Yahoo</option>
+                <option value="Outlook">Outlook</option>
+                <option value="Otro">Otro</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="Comentarios">¿Cómo te enteraste de nosotros?</label>
+            <select id="Comentarios" name="Comentarios" class="form-control" required>
+                <option value="">Selecciona una opción</option>
+                <option value="Redes Sociales">Redes Sociales</option>
+                <option value="Publicidad">Publicidad</option>
+                <option value="Recomendación">Recomendación</option>
+                <option value="Otro">Otro</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Enviar</button>
+        <button type="reset" class="btn btn-danger">Cancelar</button>
+    </form>
+
+    <!-- Tabla para mostrar datos -->
+    <table class="table table-sm mt-4">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Edad</th>
+                <th>Correo</th>
+                <th>Comentarios</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tbodyPreguntas">
+            <!-- Aquí se llenarán los datos dinámicamente -->
+        </tbody>
+    </table>
+
+    <script>
+        window.addEventListener("load", function (event) {
+            function buscar() {
+                $.get("/buscar", function (respuesta) {
+                    // Limpiar el contenido anterior
+                    $("#tbodyPreguntas").html("")
+
+                    // Llenar la tabla con la respuesta
+                    for (var x in respuesta) {
+                        var pregunta = respuesta[x]
+                        $("#tbodyPreguntas").append(`<tr>
+                            <td>${pregunta[1]}</td>
+                            <td>${pregunta[2]}</td>
+                            <td>${pregunta[3]}</td>
+                            <td>${pregunta[4]}</td>
+                            <td>
+                                <button class="btn btn-primary btn-editar" data-id="${pregunta[0]}">Editar</button>
+                                <button class="btn btn-warning btn-eliminar" data-id="${pregunta[0]}">Eliminar</button>
+                            </td>
+                        </tr>`)
+                    }
+                })
+            }
+
+            buscar()
+
+            $(document).on("click", ".btn-editar", function (event) {
+                var id = $(this).attr("data-id")
+
+                $.get("/editar", {id: id}, function (respuesta) {
+                    var pregunta = respuesta[0]
+
+                    $("#id").val(pregunta["Id_Pregunta"]).trigger("focus")
+                    $("#Nombre").val(pregunta["Nombre"])
+                    $("#Edad").val(pregunta["Edad"])
+                    $("#Correo").val(pregunta["Correo"])
+                    $("#Comentarios").val(pregunta["Comentarios"])
+                })
+            })
+
+            $(document).on("click", ".btn-eliminar", function (event) {
+                if (!confirm("¿Quieres eliminar este registro?")) {
+                    return
+                }
+
+                var id = $(this).attr("data-id")
+
+                $.post("/eliminar", {id: id}, function() {
+                    buscar()
+                })
+            })
+
+            $("#frmPreguntas").submit(function (event) {
+                event.preventDefault()
+
+                var formData = new FormData(this)
+
+                $.ajax({
+                    url: "/registrar",
+                    type: "POST",
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    success: function (respuesta) {
+                        $("#frmPreguntas").get(0).reset()
+                        buscar()
+                    }
+                })
+            })
+
+            Pusher.logToConsole = true
+            
+            var pusher = new Pusher("2358693f2b619b363f59", {
+                cluster: "us2"
+            })
+
+            var channel = pusher.subscribe("CanalPreguntas")
+            channel.bind("pregunta-evento", function (pregunta) {
+                buscar()
+            })
+        }) 
+    </script>
+</body>
+</html>
