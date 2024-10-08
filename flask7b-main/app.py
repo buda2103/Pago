@@ -1,20 +1,131 @@
-from flask import Flask
+from flask import Flask, render_template, request, jsonify, make_response
+import pusher
+import mysql.connector
 
-from flask import render_template
-from flask import request
+# Configuración de la base de datos
+con = mysql.connector.connect(
+    host="185.232.14.52",
+    database="u760464709_tst_sep",
+    user="u760464709_tst_sep_usr",
+    password="dJ0CIAFF="
+)
 
+# Inicializar la aplicación Flask
 app = Flask(__name__)
 
+# Configurar Pusher
+pusher_client = pusher.Pusher(
+    app_id="1867163",
+    key="2358693f2b619b363f59",
+    secret="880f60b50e86e4555c43",
+    cluster="us2",
+    ssl=True
+)
+
+def notificarActualizacionTelefonoArchivo():
+    pusher_client.trigger("CanalPago_curso", "pago-curso", {})
+
+# Página principal
 @app.route("/")
 def index():
-    return render_template("app.html")
+    return render_template("Pago-Curso.html")
 
-@app.route("/alumnos")
-def alumnos():
-    return render_template("alumnos.html")
+# Ruta para buscar pagos en la base de datos
+@app.route("/buscar")
+def buscar():
+    if not con.is_connected():
+        con.reconnect()
 
-@app.route("/alumnos/guardar", methods=["POST"])
-def alumnosGuardar():
-    matricula      = request.form["txtMatriculaFA"]
-    nombreapellido = request.form["txtNombreApellidoFA"]
-    return f"Matrícula {matricula} Nombre y Apellido {nombreapellido}"
+    cursor = con.cursor()
+    cursor.execute("""
+    SELECT Id_Curso_Pago, Telefono, Archivo FROM tst0_cursos_pagos 
+    ORDER BY Id_Curso_Pago DESC
+    LIMIT 10 OFFSET 0
+    """)
+    
+    registros = cursor.fetchall()
+    con.close()
+
+    return make_response(jsonify(registros))
+
+# Ruta para registrar un nuevo pago y activar el evento Pusher
+@app.route("/registrar", methods=["POST"])
+def registrar():
+    if not con.is_connected():
+        con.reconnect()
+
+    id = request.form.get("id")
+    Telefono = request.form.get("Telefono")
+    Archivo = request.form.get("Archivo")
+    
+    cursor = con.cursor()
+
+    if id:
+        sql = """
+        UPDATE tst0_cursos_pagos SET
+        Telefono = %s,
+        Archivo = %s
+        WHERE Id_Curso_Pago = %s
+        """
+        val = (Telefono, Archivo, id)
+    else:
+        sql = """
+        INSERT INTO tst0_cursos_pagos (Telefono, Archivo)
+        VALUES (%s, %s)
+        """
+        val = (Telefono, Archivo)
+    
+    cursor.execute(sql, val)
+    con.commit()
+    cursor.close()
+
+    notificarActualizacionTelefonoArchivo()
+    return make_response(jsonify({}))
+
+# Ruta para editar un registro existente
+@app.route("/editar/<int:id>", methods=["GET"])
+def editar():
+    if not con.is_connected():
+        con.reconnect()
+
+    id = request.args.get("id")
+
+    cursor = con.cursor(dictionary=True)
+    sql = """
+    SELECT Id_Curso_Pago, Telefono, Archivo FROM tst0_cursos_pagos
+    WHERE Id_Curso_Pago = %s
+    """
+    val = (id,)
+
+    cursor.execute(sql, val)
+    registros = cursor.fetchall()
+    con.close()
+
+    return make_response(jsonify(registros))
+
+# Ruta para eliminar un registro
+@app.route("/eliminar", methods=["POST"])
+def eliminar():
+    if not con.is_connected():
+        con.reconnect()
+
+    id = request.form.get("id")
+
+    cursor = con.cursor()
+    sql = """
+    DELETE FROM tst0_cursos_pagos
+    WHERE Id_Curso_Pago = %s
+    """
+    val = (id,)
+
+    cursor.execute(sql, val)
+    con.commit()
+    con.close()
+
+    notificarActualizacionTelefonoArchivo()
+
+    return make_response(jsonify({}))
+
+# Iniciar la aplicación
+if __name__ == "__main__":
+    app.run(debug=True)
